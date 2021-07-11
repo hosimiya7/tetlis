@@ -1,9 +1,9 @@
-const game_speed = 1000
+const game_speed = 600
 
     // フィールドのサイズ
     const field_col = 10
     const field_row = 20
-
+    // ブロックの大きさ
     const block_size = 30
     // スクリーンサイズ
     const screen_width = block_size * field_col
@@ -18,11 +18,18 @@ const game_speed = 1000
     can.height = screen_height
     can.style.border = "4px solid #555"
 
+    // スタート地点
+    const start_x = field_col / 2 - tetro_size / 2
+    const start_y = 0
     // テトロミノの座標
-    let tetro_x = 0;
-    let tetro_y = 0;
+    let tetro_x = start_x
+    let tetro_y = start_y
+    // テトロミノの形
+    let tetro_t = 0
     // フィールド本体
     let field = []
+    // ゲームオーバーフラグ
+    let over = false
 
     // 初期化
     function init(){
@@ -33,50 +40,115 @@ const game_speed = 1000
             }
         }
         // test
-        field[5][8] = 1
-        field[19][0] = 1
-        field[19][9] = 1
+        // field[5][8] = 1
+        // field[19][0] = 1
+        // field[19][9] = 1
     }
 
-    // テトロミノ本体
-    let tetro = [
-        [0,0,0,0],
-        [1,1,0,0],
-        [0,1,1,0],
-        [0,0,0,0],
+    const tetro_colors = [
+        "#000",
+        "#6CF",
+        "#F92",
+        "#66F",
+        "#C5C",
+        "#FD2",
+        "#6CF",
+        "#5B5",
     ]
+
+    // 三次元配列
+    const tetro_types = [
+        [], //0.空
+        [               // 1.I
+            [0,0,0,0],
+            [1,1,1,1],
+            [0,0,0,0],
+            [0,0,0,0],
+        ],
+        [               // 2.L
+            [0,1,0,0],
+            [0,1,0,0],
+            [0,1,1,0],
+            [0,0,0,0],
+        ],
+        [               // 3.J
+            [0,0,1,0],
+            [0,0,1,0],
+            [0,1,1,0],
+            [0,0,0,0],
+        ],
+        [               // 4.T
+            [0,1,0,0],
+            [0,1,1,0],
+            [0,1,0,0],
+            [0,0,0,0],
+        ],
+        [               // 5.O
+            [0,0,0,0],
+            [0,1,1,0],
+            [0,1,1,0],
+            [0,0,0,0],
+        ],
+        [               //6.Z
+            [0,0,0,0],
+            [1,1,0,0],
+            [0,1,1,0],
+            [0,0,0,0],
+        ],
+        [               //7.S
+            [0,0,0,0],
+            [0,1,1,0],
+            [1,1,0,0],
+            [0,0,0,0],
+        ]
+    ]
+
+    tetro_t = Math.floor(Math.random() * (tetro_types.length - 1)) + 1
+    tetro = tetro_types[ tetro_t ]
 
     init()
     drawAll()
 
-    // setInterval(dropTetro, game_speed)
+    setInterval(dropTetro, game_speed)
 
     // ブロック一つ描画する
-    function drawBlock(x, y){
+    function drawBlock(x, y, c){
         let print_x = x * block_size
         let print_y = y * block_size
 
-        con.fillStyle="red"
+        con.fillStyle = tetro_colors[c]
         con.fillRect(print_x,print_y,block_size,block_size)//座標と大きさ
         con.strokeStyle="black"
         con.strokeRect(print_x,print_y,block_size,block_size)
     }
 
+    // ブロックとフィールドの描画
     function drawAll(){
         con.clearRect(0,0,screen_width, screen_height)
         for(let y=0; y<field_row; y++){
             for(let x=0; x<field_col; x++){
                 if(field[y][x]){
-                    drawBlock(x, y)
+                    drawBlock(x, y, field[y][x])  //二次元配列で0か1が渡される→どこで色を判断している…？？？
                 }
             }
         }
         for(let y=0; y<tetro_size; y++){
             for(let x=0; x<tetro_size; x++){
                 if(tetro[y][x]){
-                    drawBlock(tetro_x + x, tetro_y + y)
+                    drawBlock(tetro_x + x, tetro_y + y, tetro_t)
                 }
             }
+        }
+        if(over){
+            let s = "GAME OVER"
+            con.font = "40px 'MS ゴシック'"
+            let w = con.measureText(s).width
+            let x = screen_width / 2 - w /2
+            let y = screen_height / 2 - 20
+            con.lineWidth = 4
+            con.strokeText(s, x, y)
+            con.fillStyle = "white"
+            con.filltext(s, x, y)
         }
     }
 
@@ -87,14 +159,14 @@ const game_speed = 1000
         }
         for(let y=0; y<tetro_size; y++){
             for(let x=0; x<tetro_size; x++){
-                let nx = tetro_x + mx + x
-                let ny = tetro_y + my + y
                 if(ntetro[y][x]){
-                    if(field[ny][nx] ||
-                        nx < 0 ||
+                    let nx = tetro_x + mx + x
+                    let ny = tetro_y + my + y
+                    if( nx < 0 ||
                         ny < 0 ||
                         ny >= field_row ||
-                        nx >= field_col){
+                        nx >= field_col　||
+                        field[ny][nx]){
                         return false
                     }
                 }
@@ -115,34 +187,85 @@ const game_speed = 1000
         return ntetro
     }
 
-    function dropTetro(){
-        if(checkMove(0, 1)){
-            tetro_y ++;
+    // 落ちたブロックの固定
+    function fix_tetro(){
+        for(let y=0; y<tetro_size; y++){
+            for(let x=0; x<tetro_size; x++){
+                if(tetro[y][x]){
+                    field[tetro_y + y][tetro_x + x] = tetro_t
+                }
+            }
         }
+    }
+    //
+    function checkLine(){
+        let line_count = 0
+        for(let y=0; y<field_row; y++){
+            let flag = true
+            for(let x=0; x<field_col; x++){
+                if(!field[y][x]){
+                    flag = false
+                    break
+                }
+            }
+            if(flag){
+                line_count++
+                for(let ny = y; ny>0; ny--){
+                    for(let nx = 0; nx<field_col; nx++){
+                        field[ny][nx] = field[ny - 1][nx]
+                    }
+                }
+            }
+        }
+    }
+
+    // ブロックの落ちる処理
+    function dropTetro(){
+        if(over){
+            return
+        }
+        if(checkMove(0, 1)){
+            tetro_y ++
+        }else{
+            fix_tetro()
+            checkLine()
+            tetro_t = Math.floor(Math.random() * (tetro_types.length - 1)) + 1
+            tetro = tetro_types[ tetro_t ]
+            tetro_x = start_x
+            tetro_y = start_y
+
+            if(!checkMove(0,0)){
+                over = true
+            }
+        }
+            drawAll()
     }
 
     // キーボードが押された時の処理
     document.onkeydown = function(e){
+        if(over){
+            return
+        }
         // onkeydown keycode 検索
         switch( e.keyCode ){
             case 37://左
                 if(checkMove(- 1, 0)){
-                    tetro_x --;
+                    tetro_x --
                 }
                 break;
             case 38://上
                 if(checkMove(0, -1)){
-                    tetro_y --;
+                    tetro_y --
                 }
                 break;
             case 39://右
                 if(checkMove(1, 0)){
-                    tetro_x ++;
+                    tetro_x ++
                 }
                 break;
             case 40://下
                 if(checkMove(0, 1)){
-                    tetro_y ++;
+                    tetro_y ++
                 }
                 break;
             case 32://スペース
